@@ -1,0 +1,47 @@
+name: DevOpsFlow CI/CD
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+      - run: mvn --batch-mode clean verify
+      - uses: actions/upload-artifact@v4
+        with:
+          name: devopsflow-jar
+          path: target/*.jar
+
+  docker-build:
+    needs: build-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - run: mvn --batch-mode clean package -DskipTests
+      - run: docker build -t devopsflow:${{ github.sha }} .
+      - run: docker image inspect devopsflow:${{ github.sha }}
+
+  deployment-status:
+    needs: docker-build
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "DevOpsFlow deployment stage completed."
+          echo "Commit: $GITHUB_SHA"
